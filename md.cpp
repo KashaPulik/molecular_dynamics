@@ -1,10 +1,24 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 
 double epsylon = 1;
 double sigma = 1;
+double wall_temp = 1;
+double k = 1.380649e-23;
+double mass = 1;
 size_t N = 100;
+
+enum Wall
+{
+    left = 0,
+    bottom = 1,
+    front = 2,
+    top = 3,
+    back = 4,
+    right = 5
+};
 
 class PVector
 {
@@ -72,6 +86,11 @@ typedef struct molecule
     PVector p, v, f;
 } Molecule;
 
+double frand()
+{
+    return static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
+}
+
 double u(const double r)
 {
     return 4 * epsylon * ((pow(sigma / r, 12) - pow(sigma / r, 6)));
@@ -121,6 +140,36 @@ PVector new_r(const PVector &r, const PVector &v, const PVector &a, const double
 PVector new_v(const PVector &v, const PVector &a, const PVector &new_a, const double &delta_t)
 {
     return v + (a + new_a) * delta_t / 2;
+}
+
+PVector new_v_from_wall(const Wall &wall)
+{
+    double new_v_module = sqrt(3 * k * wall_temp / mass);
+    double new_v_module_square = new_v_module * new_v_module;
+    double new_x = sqrt(frand() * new_v_module_square);
+    double new_y = sqrt(frand() * (new_v_module_square - new_x * new_x));
+    double new_z = sqrt(frand() * (new_v_module_square - new_x * new_x - new_y * new_y));
+    switch (wall)
+    {
+    case (right):
+        new_x = -new_x;
+        break;
+    case (top):
+        new_y = -new_y;
+        break;
+    case (back):
+        new_z = -new_z;
+        break;
+    }
+    return PVector(new_x, new_y, new_z);
+}
+
+PVector count_system_impulse(const std::vector<Molecule> &r)
+{
+    PVector result;
+    for (const auto &ri : r)
+        result += mass * ri.v;
+    return result;
 }
 
 
