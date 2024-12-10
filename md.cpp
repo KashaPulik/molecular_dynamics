@@ -112,7 +112,8 @@ double nuble_operator(const double &r)
 
 PVector Force(const PVector &a, const PVector &b)
 {
-    return -nuble_operator((a - b).module()) * (a - b) / (a - b).module();
+    double r = (a - b).module();
+    return -nuble_operator(r) * (a - b) / r;
 }
 
 PVector force(const std::vector<Molecule> &r, const size_t &index)
@@ -148,7 +149,7 @@ PVector new_v_from_wall(const Wall &wall)
     double new_v_module_square = new_v_module * new_v_module;
     double new_x = sqrt(frand() * new_v_module_square);
     double new_y = sqrt(frand() * (new_v_module_square - new_x * new_x));
-    double new_z = sqrt(frand() * (new_v_module_square - new_x * new_x - new_y * new_y));
+    double new_z = sqrt(new_v_module_square - new_x * new_x - new_y * new_y);
     switch (wall)
     {
     case (right):
@@ -171,8 +172,6 @@ PVector count_system_impulse(const std::vector<Molecule> &r)
         result += mass * ri.v;
     return result;
 }
-
-
 
 int main()
 {
