@@ -10,7 +10,7 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 3375;
+const size_t N = 8000;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -230,28 +230,36 @@ void de_dimensionalization(std::vector<Molecule>& particles, double& L)
     L /= sigma;
 }
 
-void count_forces(std::vector<Molecule>& particles)
+void count_forces(
+        std::vector<Molecule>& particles, const int& rank, const int& commsize)
 {
-    for (size_t i = 0; i < particles.size(); i++)
+    for (size_t i = rank; i < particles.size(); i += commsize)
         particles[i].f = force(particles, i);
 }
 
-std::vector<PVector> count_accelerations(const std::vector<Molecule>& particles)
+std::vector<PVector> count_accelerations(
+        const std::vector<Molecule>& particles,
+        const int& rank,
+        const int& commsize)
 {
     std::vector<PVector> accelerations(particles.size());
 
-    for (size_t i = 0; i < particles.size(); i++)
+    for (size_t i = rank; i < particles.size(); i += commsize)
         accelerations[i] = particles[i].f;
 
     return accelerations;
 }
 
-std::vector<PVector>
-update_positions(std::vector<Molecule>& particles, const double& delta_t)
+std::vector<PVector> update_positions(
+        std::vector<Molecule>& particles,
+        const double& delta_t,
+        const int& rank,
+        const int& commsize)
 {
-    std::vector<PVector> accelerations = count_accelerations(particles);
+    std::vector<PVector> accelerations
+            = count_accelerations(particles, rank, commsize);
 
-    for (size_t i = 0; i < particles.size(); i++)
+    for (size_t i = rank; i < particles.size(); i += commsize)
         particles[i].p = new_r(
                 particles[i].p, particles[i].v, accelerations[i], delta_t);
 
@@ -261,69 +269,173 @@ update_positions(std::vector<Molecule>& particles, const double& delta_t)
 void update_velocities(
         std::vector<Molecule>& particles,
         const std::vector<PVector>& a,
-        const double& delta_t)
+        const double& delta_t,
+        const int& rank,
+        const int& commsize)
 {
-    std::vector<PVector> new_a = count_accelerations(particles);
+    std::vector<PVector> new_a = count_accelerations(particles, rank, commsize);
 
-    for (size_t i = 0; i < particles.size(); i++)
+    for (size_t i = rank; i < particles.size(); i += commsize)
         particles[i].v = new_v(particles[i].v, a[i], new_a[i], delta_t);
 }
 
-void check_collisions(std::vector<Molecule>& particles, const double& L)
+void check_collisions(
+        std::vector<Molecule>& particles,
+        const double& L,
+        const int& rank,
+        const int& commsize)
 {
     std::vector<Wall> walls;
-    for (auto& particle : particles) {
-        if (particle.p.x_ >= L) {
-            particle.p.x_ = L;
+    for (size_t i = rank; i < particles.size(); i += commsize) {
+        if (particles[i].p.x_ >= L) {
+            particles[i].p.x_ = L;
             walls.push_back(RIGHT);
         }
-        if (particle.p.y_ >= L) {
-            particle.p.y_ = L;
+        if (particles[i].p.y_ >= L) {
+            particles[i].p.y_ = L;
             walls.push_back(TOP);
         }
-        if (particle.p.z_ >= L) {
-            particle.p.z_ = L;
+        if (particles[i].p.z_ >= L) {
+            particles[i].p.z_ = L;
             walls.push_back(BACK);
         }
-        if (particle.p.x_ <= 0) {
-            particle.p.x_ = 0;
+        if (particles[i].p.x_ <= 0) {
+            particles[i].p.x_ = 0;
             walls.push_back(LEFT);
         }
-        if (particle.p.y_ <= 0) {
-            particle.p.y_ = 0;
+        if (particles[i].p.y_ <= 0) {
+            particles[i].p.y_ = 0;
             walls.push_back(BOTTOM);
         }
-        if (particle.p.z_ <= 0) {
-            particle.p.z_ = 0;
+        if (particles[i].p.z_ <= 0) {
+            particles[i].p.z_ = 0;
             walls.push_back(FRONT);
         }
-        if (walls.size() > 0)
-            particle.v = new_v_from_wall(walls);
+        if (walls.size() > 0) {
+            particles[i].v = new_v_from_wall(walls);
+            walls.clear();
+        }
     }
 }
 
-void make_calculations()
+MPI_Datatype create_pvector_mpi_type()
 {
+    MPI_Datatype pvector_type;
+    MPI_Datatype type[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
+    int blocklen[3] = {1, 1, 1};
+    MPI_Aint disp[3];
+
+    disp[0] = offsetof(PVector, x_);
+    disp[1] = offsetof(PVector, y_);
+    disp[2] = offsetof(PVector, z_);
+
+    MPI_Type_create_struct(3, blocklen, disp, type, &pvector_type);
+    MPI_Type_commit(&pvector_type);
+
+    return pvector_type;
+}
+
+MPI_Datatype create_molecule_mpi_type(const MPI_Datatype& pvector_type)
+{
+    MPI_Datatype molecule_type;
+    MPI_Datatype type[3] = {pvector_type, pvector_type, pvector_type};
+    int blocklen[3] = {1, 1, 1};
+    MPI_Aint disp[3];
+
+    disp[0] = offsetof(Molecule, p);
+    disp[1] = offsetof(Molecule, v);
+    disp[2] = offsetof(Molecule, f);
+
+    MPI_Type_create_struct(3, blocklen, disp, type, &molecule_type);
+    MPI_Type_commit(&molecule_type);
+
+    return molecule_type;
+}
+
+void synchronize_particles(
+        std::vector<Molecule>& particles,
+        const MPI_Datatype& molecule_type,
+        const int& rank,
+        const int& commsize)
+{
+    // Определяем локальный размер и смещение
+    size_t local_count = (particles.size() + commsize - 1)
+            / commsize; // Распределение по циклу
+    size_t offset = rank * local_count;
+
+    // Срезать данные для текущего процесса
+    size_t start = offset;
+    size_t end = std::min(start + local_count, particles.size());
+    std::vector<Molecule> local_particles(
+            particles.begin() + start, particles.begin() + end);
+
+    // Узнать количество данных каждого процесса и их смещения
+    std::vector<int> counts(commsize), displs(commsize);
+    for (int i = 0; i < commsize; i++) {
+        counts[i] = std::min(local_count, particles.size() - i * local_count);
+        displs[i] = i * local_count;
+    }
+
+    // Создать буфер для объединения всех данных
+    std::vector<Molecule> synchronized_particles(particles.size());
+
+    // Собрать данные со всех процессов
+    MPI_Allgatherv(
+            local_particles.data(),
+            counts[rank],
+            molecule_type,
+            synchronized_particles.data(),
+            counts.data(),
+            displs.data(),
+            molecule_type,
+            MPI_COMM_WORLD);
+
+    // Обновить локальный вектор
+    particles = synchronized_particles;
+}
+
+int main(int argc, char** argv)
+{
+    MPI_Init(&argc, &argv);
+    int rank, commsize;
+
+    double t = MPI_Wtime();
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &commsize);
+
+    MPI_Datatype pvector_type = create_pvector_mpi_type();
+    MPI_Datatype molecule_type = create_molecule_mpi_type(pvector_type);
+
     double L = std::cbrt(N / density);
     std::vector<Molecule> particles = init_positions(N, L);
     init_velocities(particles);
     de_dimensionalization(particles, L);
-    count_forces(particles);
+    count_forces(particles, rank, commsize);
     double delta_t = 0.001;
-    size_t num_steps = 100;
+    size_t num_steps = 20;
     for (size_t step = 0; step < num_steps; step++) {
         std::vector<PVector> accelerations
-                = update_positions(particles, delta_t);
-        count_forces(particles);
-        update_velocities(particles, accelerations, delta_t);
-        check_collisions(particles, L);
+                = update_positions(particles, delta_t, rank, commsize);
+        synchronize_particles(particles, molecule_type, rank, commsize);
+        count_forces(particles, rank, commsize);
+        update_velocities(particles, accelerations, delta_t, rank, commsize);
+        check_collisions(particles, L, rank, commsize);
     }
-}
 
-int main()
-{
-    double start = MPI_Wtime();
-    make_calculations();
-    double time = MPI_Wtime() - start;
-    std::cout << "Work time: " << time << '\n';
+    synchronize_particles(particles, molecule_type, rank, commsize);
+
+    t = MPI_Wtime() - t;
+
+    double final_t = 0;
+
+    MPI_Reduce(&t, &final_t, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        std::cout << "Work time: " << final_t << '\n';
+
+    MPI_Type_free(&pvector_type);
+    MPI_Type_free(&molecule_type);
+
+    MPI_Finalize();
 }
