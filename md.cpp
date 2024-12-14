@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <mpi.h>
 #include <vector>
@@ -325,5 +326,7 @@ int main()
     double start = MPI_Wtime();
     make_calculations();
     double time = MPI_Wtime() - start;
-    std::cout << "Work time: " << time << '\n';
+    std::ofstream file("data.txt", std::ios::app);
+    file << time << '\t' << 1 << '\n';
+    file.close();
 }

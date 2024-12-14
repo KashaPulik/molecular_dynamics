@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <mpi.h>
 #include <vector>
@@ -10,7 +11,7 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 3375;
+const size_t N = 8000;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -408,7 +409,7 @@ int main(int argc, char** argv)
     de_dimensionalization(particles, L);
     count_forces(particles, rank, commsize);
     double delta_t = 0.001;
-    size_t num_steps = 100;
+    size_t num_steps = 50;
     for (size_t step = 0; step < num_steps; step++) {
         std::vector<PVector> accelerations
                 = update_positions(particles, delta_t, rank, commsize);
@@ -428,8 +429,11 @@ int main(int argc, char** argv)
 
     MPI_Reduce(&t, &final_t, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-    if (rank == 0)
-        std::cout << "Work time: " << final_t << '\n';
+    if (rank == 0) {
+        std::ofstream file("data.txt", std::ios::app);
+        file << final_t << '\t' << commsize << '\n';
+        file.close();
+    }
 
     MPI_Type_free(&pvector_type);
     MPI_Type_free(&molecule_type);

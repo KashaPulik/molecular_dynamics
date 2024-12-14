@@ -1,0 +1,7 @@
+#!/bin/sh
+#SBATCH --nodes=4 --ntasks-per-node=4
+#SBATCH --job-name=md8000p16
+
+cd $SLURM_SUBMIT_DIR
+
+mpiexec ./pmd
