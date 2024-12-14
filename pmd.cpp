@@ -10,7 +10,7 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 8000;
+const size_t N = 3375;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -352,46 +352,38 @@ MPI_Datatype create_molecule_mpi_type(const MPI_Datatype& pvector_type)
     return molecule_type;
 }
 
+void reduce_molecules(void* in, void* inout, int* len, MPI_Datatype* datatype)
+{
+    Molecule* in_vals = static_cast<Molecule*>(in);
+    Molecule* inout_vals = static_cast<Molecule*>(inout);
+
+    for (int i = 0; i < *len; ++i) {
+        if (inout_vals[i].p.x_ + inout_vals[i].p.y_ + inout_vals[i].p.z_ == 0) {
+            inout_vals[i] = in_vals[i];
+        }
+    }
+}
+
 void synchronize_particles(
         std::vector<Molecule>& particles,
         const MPI_Datatype& molecule_type,
+        const MPI_Op& molecule_op,
         const int& rank,
         const int& commsize)
 {
-    // Определяем локальный размер и смещение
-    size_t local_count = (particles.size() + commsize - 1)
-            / commsize; // Распределение по циклу
-    size_t offset = rank * local_count;
+    std::vector<Molecule> local_updates(particles.size());
 
-    // Срезать данные для текущего процесса
-    size_t start = offset;
-    size_t end = std::min(start + local_count, particles.size());
-    std::vector<Molecule> local_particles(
-            particles.begin() + start, particles.begin() + end);
-
-    // Узнать количество данных каждого процесса и их смещения
-    std::vector<int> counts(commsize), displs(commsize);
-    for (int i = 0; i < commsize; i++) {
-        counts[i] = std::min(local_count, particles.size() - i * local_count);
-        displs[i] = i * local_count;
+    for (size_t i = rank; i < particles.size(); i += commsize) {
+        local_updates[i] = particles[i];
     }
 
-    // Создать буфер для объединения всех данных
-    std::vector<Molecule> synchronized_particles(particles.size());
-
-    // Собрать данные со всех процессов
-    MPI_Allgatherv(
-            local_particles.data(),
-            counts[rank],
+    MPI_Allreduce(
+            local_updates.data(),
+            particles.data(),
+            particles.size(),
             molecule_type,
-            synchronized_particles.data(),
-            counts.data(),
-            displs.data(),
-            molecule_type,
+            molecule_op,
             MPI_COMM_WORLD);
-
-    // Обновить локальный вектор
-    particles = synchronized_particles;
 }
 
 int main(int argc, char** argv)
@@ -407,23 +399,28 @@ int main(int argc, char** argv)
     MPI_Datatype pvector_type = create_pvector_mpi_type();
     MPI_Datatype molecule_type = create_molecule_mpi_type(pvector_type);
 
+    MPI_Op molecule_op;
+    MPI_Op_create(reduce_molecules, true, &molecule_op);
+
     double L = std::cbrt(N / density);
     std::vector<Molecule> particles = init_positions(N, L);
     init_velocities(particles);
     de_dimensionalization(particles, L);
     count_forces(particles, rank, commsize);
     double delta_t = 0.001;
-    size_t num_steps = 20;
+    size_t num_steps = 100;
     for (size_t step = 0; step < num_steps; step++) {
         std::vector<PVector> accelerations
                 = update_positions(particles, delta_t, rank, commsize);
-        synchronize_particles(particles, molecule_type, rank, commsize);
+        synchronize_particles(
+                particles, molecule_type, molecule_op, rank, commsize);
         count_forces(particles, rank, commsize);
         update_velocities(particles, accelerations, delta_t, rank, commsize);
         check_collisions(particles, L, rank, commsize);
     }
 
-    synchronize_particles(particles, molecule_type, rank, commsize);
+    synchronize_particles(
+            particles, molecule_type, molecule_op, rank, commsize);
 
     t = MPI_Wtime() - t;
 
@@ -436,6 +433,7 @@ int main(int argc, char** argv)
 
     MPI_Type_free(&pvector_type);
     MPI_Type_free(&molecule_type);
+    MPI_Op_free(&molecule_op);
 
     MPI_Finalize();
 }

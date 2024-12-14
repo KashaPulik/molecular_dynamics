@@ -10,7 +10,7 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 3375;
+const size_t N = 8000;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -310,7 +310,7 @@ void make_calculations()
     de_dimensionalization(particles, L);
     count_forces(particles);
     double delta_t = 0.001;
-    size_t num_steps = 100;
+    size_t num_steps = 50;
     for (size_t step = 0; step < num_steps; step++) {
         std::vector<PVector> accelerations
                 = update_positions(particles, delta_t);
