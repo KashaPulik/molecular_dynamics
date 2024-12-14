@@ -409,7 +409,7 @@ int main(int argc, char** argv)
     de_dimensionalization(particles, L);
     count_forces(particles, rank, commsize);
     double delta_t = 0.001;
-    size_t num_steps = 50;
+    size_t num_steps = 40;
     for (size_t step = 0; step < num_steps; step++) {
         std::vector<PVector> accelerations
                 = update_positions(particles, delta_t, rank, commsize);
