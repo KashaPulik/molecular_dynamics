@@ -11,7 +11,7 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 8000;
+const size_t N = 3375;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -430,7 +430,7 @@ int main(int argc, char** argv)
     MPI_Reduce(&t, &final_t, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (rank == 0) {
-        std::ofstream file("data.txt", std::ios::app);
+        std::ofstream file("data3375.txt", std::ios::app);
         file << final_t << '\t' << commsize << '\n';
         file.close();
     }
