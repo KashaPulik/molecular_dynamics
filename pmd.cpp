@@ -206,14 +206,9 @@ std::vector<Molecule> init_positions(size_t n, double L)
     return particles;
 }
 
-double standard_deviation()
-{
-    return sqrt(3 * k * wall_temp / mass);
-}
-
 void init_velocities(std::vector<Molecule>& particles)
 {
-    double vmax = 3 * standard_deviation();
+    double vmax = sqrt(3 * k * wall_temp / mass);
     for (auto& particle : particles)
         particle.v = rand_init_vector_by_projection(vmax);
     PVector impulse = count_system_impulse(particles) / particles.size();
@@ -359,7 +354,7 @@ void reduce_molecules(void* in, void* inout, int* len, MPI_Datatype* datatype)
     Molecule* inout_vals = static_cast<Molecule*>(inout);
 
     for (int i = 0; i < *len; ++i) {
-        if (inout_vals[i].p.x_ + inout_vals[i].p.y_ + inout_vals[i].p.z_ == 0) {
+        if (inout_vals[i].f.x_ + inout_vals[i].f.y_ + inout_vals[i].f.z_ == 0) {
             inout_vals[i] = in_vals[i];
         }
     }

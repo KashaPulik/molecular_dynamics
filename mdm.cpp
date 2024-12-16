@@ -11,7 +11,6 @@ const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
 const double density = 0.8;
-const size_t N = 3375;
 
 enum Wall { LEFT = 0, BOTTOM = 1, FRONT = 2, TOP = 3, BACK = 4, RIGHT = 5 };
 
@@ -298,7 +297,7 @@ void check_collisions(std::vector<Molecule>& particles, const double& L)
     }
 }
 
-void make_calculations()
+void make_calculations(size_t N)
 {
     double L = std::cbrt(N / density);
     std::vector<Molecule> particles = init_positions(N, L);
@@ -316,12 +315,16 @@ void make_calculations()
     }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (argc != 2)
+        return 1;
+    size_t N = std::atoi(argv[1]);
+    N = N * N * N;
     double start = MPI_Wtime();
-    make_calculations();
+    make_calculations(N);
     double time = MPI_Wtime() - start;
-    std::ofstream file("data3375.txt", std::ios::app);
-    file << time << '\t' << 1 << '\n';
+    std::ofstream file("data.txt", std::ios::app);
+    file << time << '\t' << N << '\n';
     file.close();
 }

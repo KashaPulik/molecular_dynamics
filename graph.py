@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-input_file = "data.txt"
+input_file = "data8000.txt"
 output_file = "graph.jpg"
 
 processes = []
@@ -27,6 +27,23 @@ plt.yticks(odin)
 plt.xticks(odin)
 
 plt.plot(processes, speedup, marker='o', linestyle='-', color='r', label="N = 8000")
+
+input_file = "data3375.txt"
+
+processes = []
+times = []
+
+with open(input_file, 'r') as file:
+    for i, line in enumerate(file):
+        time, proc = map(float, line.split())
+        if i < 5:
+            times.append(time)
+            processes.append(int(proc)) 
+
+initial_time = times[0]
+speedup = [initial_time / t for t in times]
+
+plt.plot(processes, speedup, marker='v', linestyle='-', color='g', label="N = 3375")
 
 plt.plot(range(1,33),range(1,33),'-',c="blue",linewidth=0.5,label="Линейное ускорение")
 
