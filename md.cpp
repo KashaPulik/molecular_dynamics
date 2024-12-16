@@ -5,8 +5,8 @@
 #include <mpi.h>
 #include <vector>
 
-const double epsilon = 1.65e-21;
-const double sigma = 3.405e-10;
+const double epsilon = 1.67e-21;
+const double sigma = 3.4e-10;
 const double wall_temp = 300;
 const double k = 1.380649e-23;
 const double mass = 6.63e-26;
