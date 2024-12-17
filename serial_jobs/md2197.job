@@ -1,7 +1,7 @@
 #!/bin/sh
 #SBATCH --nodes=1 --ntasks-per-node=1
-#SBATCH --job-name=mdm20
+#SBATCH --job-name=mdm2197
 
 cd $SLURM_SUBMIT_DIR
 
-mpiexec ./mdm 20
+mpiexec ../md 2197 ../data/data.txt

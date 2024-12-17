@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 input_file = "data.txt"
-output_file = "graph1.jpg"
+output_file = "ograph.jpg"
 
 n = []
 times = []

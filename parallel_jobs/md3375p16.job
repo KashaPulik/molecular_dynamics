@@ -1,0 +1,7 @@
+#!/bin/sh
+#SBATCH --nodes=4 --ntasks-per-node=4
+#SBATCH --job-name=md3375p16
+
+cd $SLURM_SUBMIT_DIR
+
+mpiexec ../pmd 3375 ../data/data3375.txt

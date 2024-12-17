@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 input_file = "data8000.txt"
-output_file = "graph.jpg"
+output_file = "pgraph.jpg"
 
 processes = []
 times = []

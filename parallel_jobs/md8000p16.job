@@ -4,4 +4,4 @@
 
 cd $SLURM_SUBMIT_DIR
 
-mpiexec ./pmd
+mpiexec ../pmd 8000 ../data/data8000.txt
