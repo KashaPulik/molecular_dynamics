@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-input_file = "data.txt"
+input_file = "./data/data.txt"
 output_file = "ograph.jpg"
 
 n = []

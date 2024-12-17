@@ -10,4 +10,4 @@ parallel: $(PARALLEL_FILES)
 	mpicxx -Wall -o pmd $(PARALLEL_FILES)
 
 clean:
-	rm -rf md pmd slurm*
+	rm -rf md pmd slurm* *.jpg

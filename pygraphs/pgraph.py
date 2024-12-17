@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-input_file = "data8000.txt"
+input_file = "./data/data8000.txt"
 output_file = "pgraph.jpg"
 
 processes = []
@@ -31,7 +31,7 @@ plt.xticks(odin)
 
 plt.plot(processes, speedup, marker='o', linestyle='-', color='r', label="N₂ = 8000")
 
-input_file = "data3375.txt"
+input_file = "./data/data3375.txt"
 
 processes = []
 times = []
